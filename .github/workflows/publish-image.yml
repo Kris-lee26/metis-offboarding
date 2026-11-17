@@ -1,0 +1,40 @@
+name: Build and publish game image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Download repository files
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:latest"
+          docker build --tag "$image" .
+
+      - name: Check that the website responds
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:latest"
+          docker run -d -p 127.0.0.1:8080:80 "$image"
+          curl --fail --silent --show-error --retry 5 --retry-connrefused \
+            http://127.0.0.1:8080/ -o /tmp/metis-page.html
+          grep -Fq '離職帳號還在登入' /tmp/metis-page.html
+
+      - name: Publish image to GHCR
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:latest"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$image"

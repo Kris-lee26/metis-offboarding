@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>離職帳號還在登入</title>
+  <style>
+    body {
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 0 16px;
+      font-family: system-ui, sans-serif;
+      line-height: 1.6;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
+    summary { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>離職帳號還在登入</h1>
+  <p>你是今天的值班工程師。請比對兩張表，找出哪個帳號在離職後仍成功登入，再打開那筆紀錄的詳情。</p>
+
+  <h2>離職名單</h2>
+  <table>
+    <tr><th scope="col">帳號</th><th scope="col">離職日期</th></tr>
+    <tr><td>alex</td><td>11/13</td></tr>
+    <tr><td>mina</td><td>11/15</td></tr>
+    <tr><td>sam</td><td>11/16</td></tr>
+  </table>
+
+  <h2>登入紀錄</h2>
+  <table>
+    <tr>
+      <th scope="col">帳號</th>
+      <th scope="col">日期</th>
+      <th scope="col">結果</th>
+      <th scope="col">詳情</th>
+    </tr>
+    <tr>
+      <td>mina</td><td>11/14</td><td>成功</td>
+      <td><details><summary>查看</summary>這筆登入發生在離職前。</details></td>
+    </tr>
+    <tr>
+      <td>sam</td><td>11/17</td><td>失敗</td>
+      <td><details><summary>查看</summary>日期在離職後，登入結果是失敗。</details></td>
+    </tr>
+    <tr>
+      <td>alex</td><td>11/17</td><td>成功</td>
+      <td>
+        <details>
+          <summary>查看</summary>
+          離職後仍成功登入。你找到了！
+          <p><code>FLAG{offboarding_check}</code></p>
+        </details>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
