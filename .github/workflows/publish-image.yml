@@ -28,7 +28,7 @@ jobs:
         run: |
           image="ghcr.io/${GITHUB_REPOSITORY,,}:latest"
           docker run -d -p 127.0.0.1:8080:80 "$image"
-          curl --fail --silent --show-error --retry 5 --retry-connrefused \
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 --max-time 5 \
             http://127.0.0.1:8080/ -o /tmp/metis-page.html
           grep -Fq '離職帳號還在登入' /tmp/metis-page.html
 
