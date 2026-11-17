@@ -1,61 +1,250 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>離職帳號還在登入</title>
-  <style>
-    body {
-      max-width: 760px;
-      margin: 40px auto;
-      padding: 0 16px;
-      font-family: system-ui, sans-serif;
-      line-height: 1.6;
-    }
-
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
-    summary { cursor: pointer; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>離職帳號還在登入｜夜班調查</title>
+<style>
+:root{color-scheme:light;font-family:Inter,system-ui,sans-serif;background:#f2f5f4;color:#17282b}
+*{box-sizing:border-box}body{margin:0}main{width:min(1050px,100%);margin:auto;padding:clamp(20px,5vw,60px)}
+header{background:#f2f5f4;color:#17282b;border-bottom:1px solid #9aa9a6;padding-bottom:24px;margin-bottom:24px}h1{font-size:clamp(28px,5vw,48px);margin:0;letter-spacing:-.04em}h2{margin:0 0 12px;font-size:20px}
+p{line-height:1.65}.intro{color:#32474a;margin-bottom:0}.layout{display:grid;grid-template-columns:minmax(0,1.36fr) minmax(0,1fr);gap:20px}
+section{color-scheme:dark;color:#edf5ee;background:#182329;border:1px solid #36484b;border-radius:12px;padding:18px;min-width:0}
+summary{cursor:pointer}
+button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid #f6d08d;outline-offset:2px}
+.map{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(3,minmax(66px,1fr));gap:5px;background:#0e171c;border:1px solid #33484b;border-radius:8px;padding:8px}
+.cell{background:#243239;border:1px solid #34464a;border-radius:4px;position:relative;display:grid;place-content:center;text-align:center;min-width:0;padding:3px;font-size:12px}
+button.cell{background:#293d3f;color:#d9efda;border-color:#68847b}button.cell:hover{background:#3c5550}
+.position{position:absolute;inset:2px;border:2px solid #f1cf88;border-radius:4px;pointer-events:none}.position::before{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:#f1cf88;left:4px;top:4px}
+.controls{color:#b5c7c2;font-size:13px;margin-bottom:0}.location{font-weight:650;color:#edcf8e;margin:12px 0 0}.file{display:block;width:100%;background:#202e34;border:1px solid #546467;border-radius:6px;text-align:left;padding:9px 10px;margin:8px 0}
+.file[open]{border-color:#9bdcb0;background:#244037}.file:hover{border-color:#a8baae}.hint,#evidence{font-size:14px;color:#c3d2cd}.submit{border:0;border-radius:6px;padding:8px 16px;background:#b7e1b7;color:#112420;font-weight:700}
+#feedback{color:#f1cf88}#flag{background:#20392f;color:#d3f5d2;padding:12px;border:1px solid #7fa88d;border-radius:6px;font-size:14px;overflow-wrap:anywhere}
+.report-row{display:grid;gap:5px;margin:10px 0 14px}.report-row select{font:inherit;padding:7px;border:1px solid #607473;border-radius:5px;background:#202e34;color:#edf5ee;width:100%}
+@media(max-width:700px){.layout{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
+<main>
+<header>
   <h1>離職帳號還在登入</h1>
-  <p>你是今天的值班工程師。請比對兩張表，找出哪個帳號在離職後仍成功登入，再打開那筆紀錄的詳情。</p>
+  <p class="intro">你是今晚的值班工程師。剛收到兩筆「新裝置登入」告警。先到機房查日誌，再到人事室核對工單，最後回通報台判斷哪些告警該結案、哪些需要通報。</p>
+</header>
+<div class="layout">
+  <section aria-labelledby="map-title">
+    <h2 id="map-title">辦公室平面圖</h2>
+    <div id="map" class="map" aria-label="辦公室地圖"></div>
+    <p id="location" class="location" aria-live="polite"></p>
+    <p class="controls">用方向鍵或 WASD 移動，按 E 開啟房間。也可以直接點地圖上的房間。</p>
+  </section>
+  <section aria-labelledby="room-title">
+    <h2 id="room-title">值班席</h2>
+    <div id="room-content"></div>
+    <p id="evidence" aria-live="polite"></p>
+    <p id="feedback" role="status"></p>
+    <div id="flag" hidden role="status">兩筆告警都已正確處理。<strong>FLAG{offboarding_check}</strong></div>
+  </section>
+</div>
+</main>
+<script>
+const alerts = [
+  {
+    account: "芒果",
+    login: "11/17 20:12 · 公司系統 · 裝置 PC-214 · 登入成功",
+    personnel: "在職。換機工單 IT-214 已核准，11/17 發放筆電 PC-214。",
+    expected: "close"
+  },
+  {
+    account: "奇異果",
+    login: "11/17 20:24 · 公司系統 · 裝置 PC-327 · 登入成功",
+    personnel: "已離職。離職工單 HR-327 要求帳號在 11/13 18:00 前停用。",
+    expected: "report"
+  }
+];
+const rooms = { 0: "人事室", 4: "機房", 12: "通報台" };
+const directions = {
+  arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1],
+  arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]
+};
+const map = document.querySelector("#map");
+const locationLabel = document.querySelector("#location");
+const roomTitle = document.querySelector("#room-title");
+const content = document.querySelector("#room-content");
+const evidenceLabel = document.querySelector("#evidence");
+const feedback = document.querySelector("#feedback");
+const flag = document.querySelector("#flag");
+const marker = document.createElement("span");
+marker.className = "position";
+marker.setAttribute("aria-hidden", "true");
+const evidence = { login: new Set(), personnel: new Set() };
+const decisions = new Map();
+let position = 7;
 
-  <h2>離職名單</h2>
-  <table>
-    <tr><th scope="col">帳號</th><th scope="col">離職日期</th></tr>
-    <tr><td>alex</td><td>11/13</td></tr>
-    <tr><td>mina</td><td>11/15</td></tr>
-    <tr><td>sam</td><td>11/16</td></tr>
-  </table>
+function showPosition() {
+  map.children[position].append(marker);
+  locationLabel.textContent = "目前位置：" + (rooms[position] ?? "走廊");
+}
 
-  <h2>登入紀錄</h2>
-  <table>
-    <tr>
-      <th scope="col">帳號</th>
-      <th scope="col">日期</th>
-      <th scope="col">結果</th>
-      <th scope="col">詳情</th>
-    </tr>
-    <tr>
-      <td>mina</td><td>11/14</td><td>成功</td>
-      <td><details><summary>查看</summary>這筆登入發生在離職前。</details></td>
-    </tr>
-    <tr>
-      <td>sam</td><td>11/17</td><td>失敗</td>
-      <td><details><summary>查看</summary>日期在離職後，登入結果是失敗。</details></td>
-    </tr>
-    <tr>
-      <td>alex</td><td>11/17</td><td>成功</td>
-      <td>
-        <details>
-          <summary>查看</summary>
-          離職後仍成功登入。你找到了！
-          <p><code>FLAG{offboarding_check}</code></p>
-        </details>
-      </td>
-    </tr>
-  </table>
+function showEvidence() {
+  evidenceLabel.textContent =
+    "已查閱：登入日誌 " + evidence.login.size + "/" + alerts.length +
+    " ／ 人事工單 " + evidence.personnel.size + "/" + alerts.length;
+}
+
+function addHint(text) {
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = text;
+  content.append(hint);
+}
+
+function showRecords(type) {
+  const isLogin = type === "login";
+  addHint(isLogin ? "打開兩筆登入日誌，核對時間、裝置和登入結果。" : "打開兩人的工單，核對換機或離職資訊。");
+
+  for (const alert of alerts) {
+    const record = document.createElement("details");
+    const title = document.createElement("summary");
+    const detail = document.createElement("p");
+    record.className = "file";
+    title.textContent = alert.account + (isLogin ? "｜登入日誌" : "｜人事工單");
+    detail.textContent = alert[type];
+    record.append(title, detail);
+    record.addEventListener("toggle", () => {
+      if (record.open) {
+        evidence[type].add(alert.account);
+        showEvidence();
+      }
+    });
+    content.append(record);
+  }
+}
+
+function submitReport() {
+  flag.hidden = true;
+  if (decisions.size < alerts.length) {
+    feedback.textContent = "請替兩筆告警各選一種處置。";
+    return;
+  }
+
+  const incorrect = alerts.filter(alert => decisions.get(alert.account) !== alert.expected);
+  if (incorrect.length) {
+    feedback.textContent = "再核對 " + incorrect.map(alert => alert.account).join("、") + " 的裝置編號或帳號停用時間。";
+    return;
+  }
+
+  feedback.textContent = "";
+  flag.hidden = false;
+}
+
+function showReport() {
+  if (evidence.login.size < alerts.length) {
+    addHint("先到機房，把兩筆登入日誌看完。");
+    return;
+  }
+  if (evidence.personnel.size < alerts.length) {
+    addHint("還缺人事工單。到人事室查證兩筆登入。");
+    return;
+  }
+
+  for (const alert of alerts) {
+    const label = document.createElement("label");
+    const select = document.createElement("select");
+    label.className = "report-row";
+    label.textContent = alert.account;
+    for (const [value, text] of [["", "選擇處置"], ["close", "結案"], ["report", "通報"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = text;
+      select.append(option);
+    }
+    select.value = decisions.get(alert.account) ?? "";
+    select.addEventListener("change", () => {
+      if (select.value) decisions.set(alert.account, select.value);
+      else decisions.delete(alert.account);
+      flag.hidden = true;
+      feedback.textContent = "";
+    });
+    label.append(select);
+    content.append(label);
+  }
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "submit";
+  button.textContent = "送出判定";
+  button.addEventListener("click", submitReport);
+  content.append(button);
+}
+
+function openRoom() {
+  if (!rooms[position]) {
+    feedback.textContent = "走到房間格子，再按 E 開啟。";
+    return;
+  }
+  flag.hidden = true;
+  roomTitle.textContent = rooms[position];
+  content.replaceChildren();
+  feedback.textContent = "";
+
+  if (position === 4) {
+    showRecords("login");
+  } else if (position === 0) {
+    if (evidence.login.size === alerts.length) {
+      showRecords("personnel");
+    } else {
+      addHint("先到機房查閱兩筆登入日誌。");
+    }
+  } else {
+    showReport();
+  }
+}
+
+for (let square = 0; square < 15; square++) {
+  const room = rooms[square];
+  const cell = document.createElement(room ? "button" : "div");
+  cell.className = "cell";
+  if (room) {
+    cell.type = "button";
+    cell.textContent = room;
+    cell.addEventListener("click", () => {
+      position = square;
+      showPosition();
+      openRoom();
+    });
+  }
+  map.append(cell);
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.target?.closest("select, input, textarea")) return;
+  const key = event.key.toLowerCase();
+
+  if (key === "e") {
+    openRoom();
+    return;
+  }
+
+  const direction = directions[key];
+  if (!direction) return;
+  event.preventDefault();
+  const [dx, dy] = direction;
+  const x = position % 5 + dx;
+  const y = Math.floor(position / 5) + dy;
+  if (x < 0 || x >= 5 || y < 0 || y >= 3) return;
+  position = y * 5 + x;
+  showPosition();
+  content.replaceChildren();
+  roomTitle.textContent = "調查中";
+  feedback.textContent = "";
+  flag.hidden = true;
+});
+
+const startHint = document.createElement("p");
+startHint.className = "hint";
+startHint.textContent = "第一站是機房。查看兩筆新裝置登入告警。";
+content.append(startHint);
+showPosition();
+showEvidence();
+</script>
 </body>
 </html>
